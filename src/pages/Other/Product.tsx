@@ -25,11 +25,7 @@ const Product = () => {
     }
   }, [status, dispatch]);
 
-  useEffect(() => {
-    if (product && product.colors && product.colors.length > 0) {
-      setSelectedColor(product.colors[0]); // Set default color if available
-    }
-  }, [product]);
+
 
   if (status === "loading")
     return (

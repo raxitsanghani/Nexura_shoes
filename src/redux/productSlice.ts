@@ -9,12 +9,22 @@ import {
 } from "firebase/firestore";
 import { db } from "@/Database/firebase";
 
-const initialState = {
+import { Product } from "@/types";
+
+interface ProductsState {
+  products: Record<string, Product>;
+  status: "idle" | "loading" | "succeeded" | "failed";
+  error: string | null | undefined;
+  favoriteProductIds: string[];
+  favoritesStatus: "idle" | "loading" | "succeeded" | "failed";
+}
+
+const initialState: ProductsState = {
   products: {},
   status: "idle",
   error: null,
-  favoriteProductIds: [], // Add state to store favorite product IDs
-  favoritesStatus: "idle", // Add state to track favorite fetch status
+  favoriteProductIds: [],
+  favoritesStatus: "idle",
 };
 
 export const fetchProducts = createAsyncThunk(
@@ -24,11 +34,11 @@ export const fetchProducts = createAsyncThunk(
     const productSnapshot = await getDocs(query(productCollection));
     const productList = productSnapshot.docs.reduce((acc, doc) => {
       acc[doc.id] = {
-        ...doc.data(),
+        ...(doc.data() as Product),
         isFavorite: doc.data().isFavorite || false,
       };
       return acc;
-    }, {});
+    }, {} as Record<string, Product>);
     return productList;
   }
 );
@@ -62,9 +72,9 @@ export const fetchProductsByIds = createAsyncThunk(
     const q = query(productCollection, where("__name__", "in", productIds));
     const productSnapshot = await getDocs(q);
     const productList = productSnapshot.docs.reduce((acc, doc) => {
-      acc[doc.id] = doc.data();
+      acc[doc.id] = doc.data() as Product;
       return acc;
-    }, {});
+    }, {} as Record<string, Product>);
     return productList;
   }
 );
@@ -72,7 +82,18 @@ export const fetchProductsByIds = createAsyncThunk(
 const productsSlice = createSlice({
   name: "products",
   initialState,
-  reducers: {},
+  reducers: {
+    updateProductReview: (state, action) => {
+      const { productId, review, updatedRating } = action.payload;
+      if (state.products[productId]) {
+        if (!state.products[productId].reviews) {
+          state.products[productId].reviews = [];
+        }
+        state.products[productId].reviews.unshift(review);
+        state.products[productId].rating = updatedRating;
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchProducts.pending, (state) => {
@@ -111,5 +132,7 @@ const productsSlice = createSlice({
       });
   },
 });
+
+export const { updateProductReview } = productsSlice.actions;
 
 export default productsSlice.reducer;

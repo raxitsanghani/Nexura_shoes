@@ -5,12 +5,15 @@ export interface Review {
     reviewerPhoto?: string;
     reviewerEmail?: string;
     date: string; // ISO string or formatted date
+    userId: string;
+    likes: string[]; // Array of user IDs who liked the review
 }
 
 export interface Product {
     id: string;
     name: string;
     defaultImage: string;
+    defaultColorName?: string;
     discount: string;
     rating: Record<string, number>;
     reviews: Review[];
@@ -21,4 +24,5 @@ export interface Product {
     sizes: string[];
     imageUrls: Record<string, string[]>;
     isFavorite?: boolean;
+    details?: string;
 }

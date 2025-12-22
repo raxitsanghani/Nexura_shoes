@@ -28,6 +28,8 @@ const EditProduct: React.FC = () => {
   const [sizes, setSizes] = useState<string>("");
   const [defaultImage, setDefaultImage] = useState<File | null>(null);
   const [defaultImageUrl, setDefaultImageUrl] = useState<string>("");
+  const [defaultColorName, setDefaultColorName] = useState<string>("");
+  const [details, setDetails] = useState<string>("");
   const [imageUrls, setImageUrls] = useState<Record<string, string[]>>({});
   // @ts-ignore
   const [productReviews, setProductReviews] = useState<any[]>([]);
@@ -45,6 +47,8 @@ const EditProduct: React.FC = () => {
         setDiscount(productData.discount);
         setFeatures(productData.features.join(", "));
         setSizes(productData.sizes.join(", "));
+        setDetails(productData.details || "");
+        setDefaultColorName(productData.defaultColorName || "");
         setDefaultImageUrl(productData.defaultImage);
         setImageUrls(productData.imageUrls || {});
         // @ts-ignore
@@ -87,9 +91,9 @@ const EditProduct: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const categoriesArray = categories.split(",").map((item) => item.trim());
-    const featuresArray = features.split(",").map((item) => item.trim());
-    const sizesArray = sizes.split(",").map((item) => item.trim());
+    const categoriesArray = categories.split(",").map((item) => item.trim()).filter(item => item !== "");
+    const featuresArray = features.split(",").map((item) => item.trim()).filter(item => item !== "");
+    const sizesArray = sizes.split(",").map((item) => item.trim()).filter(item => item !== "");
 
     const newImageUrls = { ...imageUrls };
     let newDefaultImageUrl = defaultImageUrl;
@@ -130,6 +134,8 @@ const EditProduct: React.FC = () => {
         imageUrls: newImageUrls,
         defaultImage: newDefaultImageUrl,
         sizes: sizesArray,
+        details: details,
+        defaultColorName: defaultColorName,
       });
       alert("Product updated successfully");
     } catch (error) {
@@ -222,8 +228,15 @@ const EditProduct: React.FC = () => {
         ))}
         <div>
           <label className="block text-gray-700 font-semibold">
-            Default Image
+            Default Image & Primary Color Name
           </label>
+          <input
+            type="text"
+            placeholder="Primary Color Name (e.g. Green)"
+            value={defaultColorName}
+            onChange={(e) => setDefaultColorName(e.target.value)}
+            className="mb-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-300 w-full"
+          />
           <input
             type="file"
             onChange={handleDefaultImageChange}
@@ -268,6 +281,17 @@ const EditProduct: React.FC = () => {
             className="mt-1 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-300"
           />
         </div>
+        <div>
+          <label className="block text-gray-700 font-semibold">
+            Product Details
+          </label>
+          <textarea
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            className="mt-1 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-300"
+            rows={4}
+          />
+        </div>
         <button
           type="submit"
           className="w-full px-4 py-2 bg-black text-white font-bold rounded-md hover:bg-blue-600"
@@ -287,9 +311,22 @@ const EditProduct: React.FC = () => {
             {/* @ts-ignore */}
             {productReviews?.map((review, index) => (
               <div key={index} className="border p-4 rounded-md bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold">{review.reviewerName}</span>
-                  <span className="text-sm text-gray-500">{review.date}</span>
+                <div className="flex items-center gap-3 mb-2">
+                  {review.reviewerPhoto ? (
+                    <img
+                      src={review.reviewerPhoto}
+                      alt={review.reviewerName || "User"}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold">
+                      {(review.reviewerName && review.reviewerName.length > 0) ? review.reviewerName.charAt(0).toUpperCase() : "U"}
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold block">{review.reviewerName}</span>
+                    <span className="text-sm text-gray-500 block">{review.date}</span>
+                  </div>
                 </div>
                 <div className="mb-2">
                   <Rating

@@ -5,17 +5,9 @@ import { Progress } from "@/components/ui/progress";
 import React, { useState } from "react";
 import useAverageRating from "@/hooks/useAvarageRating";
 // Define types for the user and product
-interface User {
-  name?: string;
-  profileImage?: string;
-  time?: { seconds: number; nanoseconds: number };
-  rating?: number;
-  comment?: string;
-}
-
 interface Product {
-  description?: string;
-  reviews?: User[];
+  details?: string;
+  reviews?: any[];
   rating?: { [key: number]: number };
 }
 
@@ -24,18 +16,6 @@ interface ProductDescriptionProps {
 }
 
 const ProductDescription: React.FC<ProductDescriptionProps> = ({ product }) => {
-  function formatTimestamp(timestamp?: {
-    seconds: number;
-    nanoseconds: number;
-  }) {
-    if (!timestamp) return ""; // Handle missing timestamp
-    const milliseconds = timestamp.seconds * 1000 + timestamp.nanoseconds / 1e6;
-    const date = new Date(milliseconds);
-    const formattedDate = date.toLocaleDateString();
-    const formattedTime = date.toLocaleTimeString();
-    return `${formattedDate} - ${formattedTime}`;
-  }
-
   const [visibleCount, setVisibleCount] = useState(2);
   const handleSeeMore = () => {
     setVisibleCount((prevCount) => prevCount + 2);
@@ -57,12 +37,11 @@ const ProductDescription: React.FC<ProductDescriptionProps> = ({ product }) => {
         <TabsTrigger value="review">Review</TabsTrigger>
       </TabsList>
 
-      {product.description ? (
+      {product.details ? (
         <TabsContent value="details">
           <div>
-            <h2 className="text-lg font-bold">Product details</h2>
-            {/* @ts-ignore */}
-            <VerticalTable data={product} product={product} />
+            <h2 className="text-lg font-bold mb-2">Product details</h2>
+            <p className="whitespace-pre-wrap text-gray-700">{product.details}</p>
           </div>
         </TabsContent>
       ) : null}
@@ -71,26 +50,26 @@ const ProductDescription: React.FC<ProductDescriptionProps> = ({ product }) => {
         <TabsContent value="review">
           <div className="flex md:flex-row w-full flex-col gap-10 md:justify-between">
             <div className="md:w-1/2 flex flex-col gap-4">
-              {reviewData.slice(0, visibleCount).map((user, index) => (
+              {reviewData.slice(0, visibleCount).map((review, index) => (
                 <React.Fragment key={index}>
                   <div className="flex gap-2 p-1">
                     <img
-                      src={user.profileImage || "/default-profile.png"}
+                      src={review.reviewerPhoto || "/default-profile.png"}
                       alt=""
                       className="w-10 h-10 rounded-full"
                     />
                     <div className="flex flex-col gap-1 mt-[2px]">
                       <div className="flex text-xs gap-2">
                         <h2 className="font-bold">
-                          {user.name || "Anonymous"}
+                          {review.reviewerName || "Anonymous"}
                         </h2>
                         <p className="text-cs_gray">
-                          {formatTimestamp(user.time)}
+                          {review.date}
                         </p>
                       </div>
-                      <RatingProvider size={"16px"} rating={user.rating || 0} />
+                      <RatingProvider size={"16px"} rating={review.rating || 0} />
                       <h2 className="text-sm font-semibold mt-3">
-                        {user.comment || "No comment"}
+                        {review.reviewText || "No comment"}
                       </h2>
                     </div>
                   </div>

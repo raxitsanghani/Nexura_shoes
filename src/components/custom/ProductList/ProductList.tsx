@@ -12,21 +12,7 @@ import { fetchUserFavorites } from "@/utils/fetchUserFavorites";
 import ReactLoading from "react-loading";
 
 // Define types for the product and props
-interface Product {
-  id: string;
-  name: string;
-  defaultImage: string;
-  discount: string;
-  rating: Record<string, number>;
-  reviews: {
-    time: number;
-    [key: string]: any;
-  }[];
-  features: string[];
-  price: string;
-  categories: string[];
-  isFavorite: boolean;
-}
+import { Product } from "@/types";
 
 interface ProductListProps {
   selectedCategory?: string;
@@ -185,8 +171,7 @@ const ProductList: React.FC<ProductListProps> = ({ selectedCategory }) => {
                     <div className="flex items-center">
                       <RatingProvider
                         size={"16px"}
-                        // @ts-ignore
-                        rating={averageRating.toFixed(2)}
+                        rating={Number(averageRating.toFixed(2))}
                       />
                     </div>
                     <p className="text-sm font-medium text-gray-900 dark:text-white">

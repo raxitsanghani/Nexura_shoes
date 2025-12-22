@@ -16,20 +16,7 @@ import { fetchUserFavorites } from "@/utils/fetchUserFavorites";
 import { handleAddToCart } from "@/utils/handleToggleCart";
 import ReactLoading from "react-loading";
 
-interface Product {
-  id: string;
-  name?: string;
-  price?: number;
-  colors?: string[];
-  sizes?: number[];
-  rating?: { [key: number]: number };
-  imageUrls?: { [key: string]: string[] };
-  defaultImage?: string;
-}
 
-interface ProductDetailsProps {
-  handleColorChange: (color: string) => void;
-}
 
 const ProductDetails = ({
   handleColorChange,
@@ -42,10 +29,8 @@ const ProductDetails = ({
     // @ts-ignore
     (state: RootState) => state.products.products[id]
   ); // Access product using ID from URL
-  const [sizeState, setSize] = useState<number | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string | null>(
-    product?.colors?.[0] || null
-  );
+  const [sizeState, setSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const auth = getAuth();
@@ -76,7 +61,14 @@ const ProductDetails = ({
     }
   }, [userId, id, product]);
 
-  const sizes = product?.sizes || [40.5, 41, 42, 43, 43.5, 44, 44.5, 45, 46];
+  // Robustly ensure sizes is an array of strings, even if stored as a comma-separated string
+  const rawSizes = product?.sizes || ["40.5", "41", "42", "43", "43.5", "44", "44.5", "45", "46"];
+  const sizes = Array.isArray(rawSizes)
+    ? rawSizes
+    : typeof rawSizes === "string"
+      ? rawSizes.split(",").map(s => s.trim()).filter(s => s !== "")
+      : [];
+
   const { averageRating, totalPeople } = useAverageRating(
     product?.rating || {}
   );
@@ -101,8 +93,8 @@ const ProductDetails = ({
   };
 
   const funcAddToCart = async () => {
-    const colorToUse = selectedColor || product.colors?.[0] || "defaultColor";
-    const sizeToUse = sizeState || product.sizes?.[0] || 40.5;
+    const colorToUse = selectedColor || "Default";
+    const sizeToUse = sizeState || (sizes.length > 0 ? sizes[0] : "40.5");
 
     if (userId) {
       try {
@@ -151,9 +143,9 @@ const ProductDetails = ({
       <h2 className="text-2xl font-semibold py-5">
         {product.name || "Product Name"}
       </h2>
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center">
         <RatingProvider size={"16px"} rating={averageRating || 0} />
-        <p className="text-cs_gray text-xs">{totalPeople || 0} reviews</p>
+        <p className="text-cs_gray text-xs">{averageRating > 0 ? averageRating.toFixed(1) : ""} ({totalPeople || 0} reviews)</p>
       </div>
       <h1 className="text-3xl font-semibold py-5">
         ₹{product.price?.toFixed(2) || "0.00"}
@@ -163,25 +155,41 @@ const ProductDetails = ({
         <div>
           Color:{" "}
           <span className="text-cs_gray">
-            {selectedColor || "Select Color"}
+            {selectedColor || product.defaultColorName || "Select Color"}
           </span>
         </div>
         <div className="flex gap-3 mt-2">
+          {/* Default/Original Color Option */}
+          {product.defaultImage && (
+            <img
+              src={product.defaultImage}
+              key="default"
+              onClick={() => {
+                setSelectedColor(null);
+                handleColorChange("");
+              }}
+              className={`w-14 rounded-xl cursor-pointer border-2 ${selectedColor === null || selectedColor === ""
+                ? "border-primary-700"
+                : "border-transparent"
+                } hover:border-primary-700`}
+              alt="Default Color"
+              title="Default"
+            />
+          )}
+
           {/* @ts-ignore */}
           {product.colors?.map((color) => (
             <img
               src={
                 product.imageUrls?.[color]?.[0] ||
-                product.defaultImage ||
                 Image.white
               }
               key={color}
               onClick={() => handleColorClick(color.trim())}
-              className={`w-14 rounded-xl cursor-pointer border-2 ${
-                color === selectedColor
-                  ? "border-primary-700"
-                  : "border-transparent"
-              } hover:border-primary-700`}
+              className={`w-14 rounded-xl cursor-pointer border-2 ${color === selectedColor
+                ? "border-primary-700"
+                : "border-transparent"
+                } hover:border-primary-700`}
               alt={color}
             />
           ))}
@@ -189,25 +197,24 @@ const ProductDetails = ({
       </div>
 
       <div className="mt-3">
-        <h2>Size: {sizeState !== null ? sizeState : "Select a size"}</h2>
+        <h2 className="text-sm font-medium mb-3">Size: {sizeState !== null ? sizeState : "Select a size"}</h2>
         <div className="w-full flex flex-wrap gap-3 mt-2">
           {/* @ts-ignore */}
           {sizes.map((size) => (
             <Button
               key={size}
               variant={"outline"}
-              className={`${
-                size === sizeState
-                  ? "bg-black text-white hover:bg-black hover:text-slate-200"
-                  : ""
-              } w-14`}
-              onClick={() => setSize(size)}
+              className={`${String(size) === String(sizeState)
+                ? "bg-black text-white hover:bg-black hover:text-slate-200 border-black"
+                : "border-gray-200 text-gray-900 hover:border-black hover:bg-white active:bg-gray-100"
+                } min-w-[3.5rem] h-11 px-3 text-sm font-medium transition-all duration-200 rounded-md shadow-sm`}
+              onClick={() => setSize(String(size))}
             >
               {size}
             </Button>
           ))}
         </div>
-        <h2 className="text-xs text-cs_yellow mt-3">Size guide</h2>
+        <h2 className="text-xs text-cs_yellow mt-3 cursor-pointer hover:underline">Size guide</h2>
       </div>
 
       <div className="w-full mt-3">
