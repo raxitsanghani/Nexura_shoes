@@ -185,7 +185,7 @@ const ProductDetails = ({
                 Image.white
               }
               key={color}
-              onClick={() => handleColorClick(color.trim())}
+              onClick={() => handleColorClick(color)}
               className={`w-14 rounded-xl cursor-pointer border-2 ${color === selectedColor
                 ? "border-primary-700"
                 : "border-transparent"

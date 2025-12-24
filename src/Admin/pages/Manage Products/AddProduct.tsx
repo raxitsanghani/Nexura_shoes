@@ -22,11 +22,14 @@ const AddProduct = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleAddColor = () => {
-    const colorInput = prompt("Enter color name:");
-    if (colorInput && !colors.includes(colorInput)) {
-      setColors((prevColors) => [...prevColors, colorInput]);
-      setImageFiles((prev) => ({ ...prev, [colorInput]: [] }));
-      setImagePreviews((prev) => ({ ...prev, [colorInput]: [] }));
+    const rawInput = prompt("Enter color name:");
+    if (rawInput) {
+      const colorInput = rawInput.trim();
+      if (colorInput && !colors.includes(colorInput)) {
+        setColors((prevColors) => [...prevColors, colorInput]);
+        setImageFiles((prev) => ({ ...prev, [colorInput]: [] }));
+        setImagePreviews((prev) => ({ ...prev, [colorInput]: [] }));
+      }
     }
   };
 
@@ -112,42 +115,56 @@ const AddProduct = () => {
       const featuresArray = features.split(",").map((item) => item.trim()).filter(item => item !== "");
       const sizesArray = sizes.split(",").map((item) => item.trim()).filter(item => item !== "");
 
+      // Record<colorName, [urls]>
       const imageUrlsArray: Record<string, string[]> = {};
       let primaryDefaultImageUrl = "";
 
-      // Upload default images
+      // 1. Upload default images (Sequential)
       if (defaultImageFiles.length > 0) {
-        const defaultUploadPromises = defaultImageFiles.map(async (file, index) => {
-          const sanitizedName = name.replace(/\s+/g, "_");
+        const defaultImageUrls: string[] = [];
+        for (const file of defaultImageFiles) {
+          const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, "_");
           const sanitizedFileName = file.name.replace(/\s+/g, "_");
+          const timestamp = Date.now();
           const defaultImageRef = ref(
             storage,
-            `shoes/${sanitizedName}/default/${index}_${sanitizedFileName}`
+            `shoes/${sanitizedName}/default/${timestamp}_${sanitizedFileName}`
           );
           await uploadBytes(defaultImageRef, file);
-          return getDownloadURL(defaultImageRef);
-        });
-        const defaultImageUrlsArray = await Promise.all(defaultUploadPromises);
-        primaryDefaultImageUrl = defaultImageUrlsArray[0];
-        imageUrlsArray["default"] = defaultImageUrlsArray;
+          const url = await getDownloadURL(defaultImageRef);
+          defaultImageUrls.push(url);
+        }
+
+        if (defaultImageUrls.length > 0) {
+          primaryDefaultImageUrl = defaultImageUrls[0];
+          imageUrlsArray["default"] = defaultImageUrls;
+        }
       }
 
-      // Parallelize image uploads for better performance
-      await Promise.all(colors.map(async (color) => {
+      // 2. Upload Color Bundle Images (Sequential)
+      // We iterate one by one to avoid rate-limiting issues or concurrency bugs with large batches
+      for (const color of colors) {
         if (imageFiles[color] && imageFiles[color].length > 0) {
-          const uploadPromises = imageFiles[color].map(async (file) => {
-            const sanitizedName = name.replace(/\s+/g, "_");
-            const sanitizedColor = color.replace(/\s+/g, "_");
+          const uploadedUrls: string[] = [];
+
+          for (const file of imageFiles[color]) {
+            const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, "_");
+            // Sanitize color to avoid deep nested folder issues if color has slashes like "Black/Yamabuki"
+            const sanitizedColor = color.replace(/[^a-zA-Z0-9]/g, "_");
             const sanitizedFileName = file.name.replace(/\s+/g, "_");
-            const imageRef = ref(storage, `shoes/${sanitizedName}/${sanitizedColor}/${sanitizedFileName}`);
+            const timestamp = Date.now(); // Ensure unique path even if filenames are same
+
+            const imageRef = ref(storage, `shoes/${sanitizedName}/${sanitizedColor}/${timestamp}_${sanitizedFileName}`);
+
             await uploadBytes(imageRef, file);
-            return getDownloadURL(imageRef);
-          });
-          imageUrlsArray[color] = await Promise.all(uploadPromises);
+            const url = await getDownloadURL(imageRef);
+            uploadedUrls.push(url);
+          }
+          imageUrlsArray[color] = uploadedUrls;
         } else {
           imageUrlsArray[color] = [];
         }
-      }));
+      }
 
       // Fallback: If no default image set, use the first available color image
       if (!primaryDefaultImageUrl) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { db, storage } from "@/Database/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import {
@@ -16,7 +16,7 @@ import { Rating } from "react-simple-star-rating";
 
 const EditProduct: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [name, setName] = useState<string>("");
   const [price, setPrice] = useState<string>("");
   const [categories, setCategories] = useState<string>("");
@@ -26,8 +26,11 @@ const EditProduct: React.FC = () => {
   const [features, setFeatures] = useState<string>("");
   const [imageFiles, setImageFiles] = useState<Record<string, File[]>>({});
   const [sizes, setSizes] = useState<string>("");
-  const [defaultImage, setDefaultImage] = useState<File | null>(null);
-  const [defaultImageUrl, setDefaultImageUrl] = useState<string>("");
+  // State for multiple default images
+  const [defaultImageFiles, setDefaultImageFiles] = useState<File[]>([]);
+  // Store default images as string array for consistency with backend
+  const [defaultImageUrls, setDefaultImageUrls] = useState<string[]>([]);
+
   const [defaultColorName, setDefaultColorName] = useState<string>("");
   const [details, setDetails] = useState<string>("");
   const [imageUrls, setImageUrls] = useState<Record<string, string[]>>({});
@@ -37,22 +40,47 @@ const EditProduct: React.FC = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       if (!productId) return;
-      const productDoc = await getDoc(doc(db, "products", productId));
-      if (productDoc.exists()) {
-        const productData = productDoc.data() as Product;
-        setName(productData.name);
-        setPrice(productData.price.toString());
-        setCategories(productData.categories.join(", "));
-        setColors(productData.colors);
-        setDiscount(productData.discount);
-        setFeatures(productData.features.join(", "));
-        setSizes(productData.sizes.join(", "));
-        setDetails(productData.details || "");
-        setDefaultColorName(productData.defaultColorName || "");
-        setDefaultImageUrl(productData.defaultImage);
-        setImageUrls(productData.imageUrls || {});
-        // @ts-ignore
-        setProductReviews(productData.reviews || []);
+      try {
+        const productDoc = await getDoc(doc(db, "products", productId));
+        if (productDoc.exists()) {
+          const productData = productDoc.data() as Product;
+          setName(productData.name);
+          setPrice(productData.price ? productData.price.toString() : "");
+          // Handle potential missing fields or different formats
+          setCategories(Array.isArray(productData.categories) ? productData.categories.join(", ") : "");
+          setColors(productData.colors || []);
+          setDiscount(productData.discount || "");
+          setFeatures(Array.isArray(productData.features) ? productData.features.join(", ") : "");
+          setSizes(Array.isArray(productData.sizes) ? productData.sizes.join(", ") : "");
+          setDetails(productData.details || "");
+          setDefaultColorName(productData.defaultColorName || "");
+
+          // Handle default images normalization (string vs array)
+          let defImgs: string[] = [];
+          // @ts-ignore checking specifically for potential array format in existing data or legacy string
+          if (Array.isArray(productData.defaultImage)) {
+            // @ts-ignore
+            defImgs = productData.defaultImage;
+            // Check if 'default' key in imageUrls also has images that should be considered default
+            if (productData.imageUrls && productData.imageUrls["default"]) {
+              // Merge unique
+              const set = new Set([...defImgs, ...productData.imageUrls["default"]]);
+              defImgs = Array.from(set);
+            }
+          } else if (typeof productData.defaultImage === "string" && productData.defaultImage) {
+            defImgs = [productData.defaultImage];
+          } else if (productData.imageUrls && productData.imageUrls["default"]) {
+            // Fallback if defaultImage field is empty but "default" key exists in map
+            defImgs = productData.imageUrls["default"];
+          }
+          setDefaultImageUrls(defImgs);
+
+          setImageUrls(productData.imageUrls || {});
+          // @ts-ignore
+          setProductReviews(productData.reviews || []);
+        }
+      } catch (err) {
+        console.error("Error fetching product:", err);
       }
     };
 
@@ -60,9 +88,10 @@ const EditProduct: React.FC = () => {
   }, [productId]);
 
   const handleAddColor = () => {
-    if (colorInput && !colors.includes(colorInput)) {
-      setColors((prevColors) => [...prevColors, colorInput]);
-      setImageFiles((prev) => ({ ...prev, [colorInput]: [] }));
+    const trimmedColor = colorInput.trim();
+    if (trimmedColor && !colors.includes(trimmedColor)) {
+      setColors((prevColors) => [...prevColors, trimmedColor]);
+      setImageFiles((prev) => ({ ...prev, [trimmedColor]: [] }));
       setColorInput("");
     }
   };
@@ -72,7 +101,9 @@ const EditProduct: React.FC = () => {
   };
 
   const handleDefaultImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDefaultImage(e.target.files![0]);
+    if (e.target.files) {
+      setDefaultImageFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+    }
   };
 
   const handleDeleteImage = async (color: string, imageUrl: string) => {
@@ -96,32 +127,59 @@ const EditProduct: React.FC = () => {
     const sizesArray = sizes.split(",").map((item) => item.trim()).filter(item => item !== "");
 
     const newImageUrls = { ...imageUrls };
-    let newDefaultImageUrl = defaultImageUrl;
 
-    // Upload default image if changed
-    if (defaultImage) {
-      const sanitizedName = name.replace(/\s+/g, "_");
-      const sanitizedFileName = defaultImage.name.replace(/\s+/g, "_");
-      const defaultImageRef = ref(
-        storage,
-        `shoes/${sanitizedName}/default/${sanitizedFileName}`
-      );
-      await uploadBytes(defaultImageRef, defaultImage);
-      newDefaultImageUrl = await getDownloadURL(defaultImageRef);
+    // Handle Default Images (Upload new files)
+    const uploadedDefaultUrls: string[] = [];
+    if (defaultImageFiles.length > 0) {
+      for (const file of defaultImageFiles) {
+        const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, "_");
+        const sanitizedFileName = file.name.replace(/\s+/g, "_");
+        const timestamp = Date.now();
+        const defaultImageRef = ref(
+          storage,
+          `shoes/${sanitizedName}/default/${timestamp}_${sanitizedFileName}`
+        );
+        try {
+          await uploadBytes(defaultImageRef, file);
+          const url = await getDownloadURL(defaultImageRef);
+          uploadedDefaultUrls.push(url);
+        } catch (err) {
+          console.error("Error uploading default image:", err);
+          // alert? continue?
+        }
+      }
     }
 
-    // Upload new color images
-    for (let color of colors) {
-      if (imageFiles[color]) {
+    // Combine existing valid default URLs with newly uploaded ones
+    const finalDefaultUrls = [...defaultImageUrls, ...uploadedDefaultUrls];
+    newImageUrls["default"] = finalDefaultUrls;
+
+    // Determine the "Primary" default image (fallback for single-string usage or thumbnail)
+    const primaryDefaultImage = finalDefaultUrls.length > 0 ? finalDefaultUrls[0] : "";
+
+    // 2. Upload new color images (Sequential)
+    // Using for...of loop ensures sequential execution to prevent rate limiting or race conditions
+    for (const color of colors) {
+      if (imageFiles[color] && imageFiles[color].length > 0) {
         newImageUrls[color] = newImageUrls[color] || [];
-        for (let file of imageFiles[color]) {
-          const sanitizedName = name.replace(/\s+/g, "_");
-          const sanitizedColor = color.replace(/\s+/g, "_");
+
+        for (const file of imageFiles[color]) {
+          const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, "_");
+          const sanitizedColor = color.replace(/[^a-zA-Z0-9]/g, "_");
           const sanitizedFileName = file.name.replace(/\s+/g, "_");
-          const imageRef = ref(storage, `shoes/${sanitizedName}/${sanitizedColor}/${sanitizedFileName}`);
-          await uploadBytes(imageRef, file);
-          const downloadURL = await getDownloadURL(imageRef);
-          newImageUrls[color].push(downloadURL);
+          const timestamp = Date.now();
+
+          const imageRef = ref(storage, `shoes/${sanitizedName}/${sanitizedColor}/${timestamp}_${sanitizedFileName}`);
+
+          try {
+            await uploadBytes(imageRef, file);
+            const downloadURL = await getDownloadURL(imageRef);
+            newImageUrls[color].push(downloadURL);
+          } catch (err) {
+            console.error(`Error uploading image for color ${color}:`, err);
+            // Continue with other images even if one fails, or alert user?
+            // For now, logging error is safer than crashing entire submit
+          }
         }
       }
     }
@@ -137,14 +195,22 @@ const EditProduct: React.FC = () => {
         discount,
         features: featuresArray,
         imageUrls: newImageUrls,
-        defaultImage: newDefaultImageUrl,
+        defaultImage: primaryDefaultImage,
         sizes: sizesArray,
         details: details,
         defaultColorName: defaultColorName,
       });
       alert("Product updated successfully");
+
+      // Clear file inputs after successful upload to prevent double uploading if user clicks update again mistakenly
+      setImageFiles({});
+      setDefaultImageFiles([]);
+      setDefaultImageUrls(finalDefaultUrls);
+      // We could also reload the page or navigate, but keeping state allows further edits
+
     } catch (error) {
       console.error("Error updating document: ", error);
+      alert("Failed to update product database.");
     }
   };
 
@@ -233,7 +299,7 @@ const EditProduct: React.FC = () => {
         ))}
         <div>
           <label className="block text-gray-700 font-semibold">
-            Default Image & Primary Color Name
+            Default Images & Primary Color Name
           </label>
           <input
             type="text"
@@ -244,16 +310,57 @@ const EditProduct: React.FC = () => {
           />
           <input
             type="file"
+            multiple
             onChange={handleDefaultImageChange}
             className="mt-1 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-300"
           />
-          {defaultImageUrl && (
-            <img
-              src={defaultImageUrl}
-              alt="Default Preview"
-              className="mt-2 w-32 h-32 object-cover"
-            />
-          )}
+
+          {/* Display Existing Default Images (URLs) */}
+          <div className="flex flex-wrap gap-2 mt-2">
+            {defaultImageUrls.map((url, index) => (
+              <div key={`def-url-${index}`} className="relative group">
+                <img
+                  src={url}
+                  alt={`Default Preview ${index}`}
+                  className="w-24 h-24 object-cover rounded shadow-sm border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newUrls = defaultImageUrls.filter(u => u !== url);
+                    setDefaultImageUrls(newUrls);
+                    if (url.includes("firebase")) {
+                      const imageRef = ref(storage, url);
+                      deleteObject(imageRef).catch(e => console.error("Del def img err", e));
+                    }
+                  }}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer"
+                >
+                  <RxCross1 size={14} />
+                </button>
+              </div>
+            ))}
+
+            {/* Display Newly Selected Files */}
+            {defaultImageFiles.map((file, index) => (
+              <div key={`def-file-${index}`} className="relative group">
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt="New File Preview"
+                  className="w-24 h-24 object-cover rounded shadow-sm border border-gray-200 opacity-80"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDefaultImageFiles(prev => prev.filter((_, i) => i !== index));
+                  }}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer shadow-lg"
+                >
+                  <RxCross1 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
         <div>
           <label className="block text-gray-700 font-semibold">Discount</label>
