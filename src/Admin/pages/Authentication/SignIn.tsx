@@ -11,7 +11,7 @@ const SignIn = () => {
     e.preventDefault();
 
     // Simulate successful login (replace this logic with real API call)
-    if (email === "admin@admin.com" && password === "password") {
+    if (email.trim() === "raxitsanghani21@gmail.com" && password.trim() === "raxit2112") {
       login("login-token"); // Pass a fake token
     } else {
       alert("Invalid credentials");

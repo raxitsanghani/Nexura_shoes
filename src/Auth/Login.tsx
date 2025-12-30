@@ -49,7 +49,7 @@ const Login = () => {
     console.log("User Data:", user);
 
     // Check for Admin Credentials
-    if (user.email === "raxitsanghani@gmail.com" && user.password === "raxit@951026") {
+    if (user.email === "raxitsanghani21@gmail.com" && user.password === "raxit2112") {
       localStorage.setItem("authToken", "admin-token"); // Set token for Admin Protected Route
       toast({ description: "Admin Login Success!" });
       setLoading(false);
