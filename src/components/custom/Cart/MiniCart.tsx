@@ -217,7 +217,7 @@ const MiniCart = () => {
                                         .map((p: any) => (
                                             <Link key={p.id} to={`/product/${p.id}`} onClick={() => dispatch(closeCart())} className="min-w-[120px] w-[120px] group">
                                                 <div className="aspect-square bg-gray-50 rounded-md overflow-hidden mb-2">
-                                                    <img src={p.defaultImage || Object.values(p.imageUrls || {})[0]?.[0]} alt={p.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
+                                                    <img src={p.defaultImage || (Object.values(p.imageUrls || {}) as any)[0]?.[0]} alt={p.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform" />
                                                 </div>
                                                 <p className="text-xs font-medium truncate">{p.name}</p>
                                                 <p className="text-xs text-gray-500">₹{p.price}</p>

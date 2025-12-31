@@ -62,10 +62,10 @@ const HomeFeatured = () => {
 
 
   return (
-    <section className="relative pt-24 pb-10 antialiased md:pt-28 md:pb-10">
+    <section className="relative min-h-screen flex items-center pt-24 pb-10 antialiased md:pt-0 md:pb-0 overflow-hidden">
       <VideoBackground />
-      <div className="relative backdrop-blur-[0px] mx-auto grid px-4 pb-16 md:grid-cols-12 lg:gap-12 lg:pb-16 xl:gap-0 ">
-        <div className="content-center justify-self-start md:col-span-7 md:ml-5 md:text-start">
+      <div className="relative w-full h-full px-8 md:px-24 grid md:grid-cols-12 items-center gap-0">
+        <div className="flex flex-col justify-center items-start md:col-span-6 z-10">
           <h1 className="mb-4 text-4xl font-bold leading-none tracking-tight font-sans  md:max-w-2xl md:text-6xl xl:text-8xl">
             Best In Style
             <br />
