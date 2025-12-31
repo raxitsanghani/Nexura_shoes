@@ -1,7 +1,7 @@
 import { HiOutlineShoppingBag } from "react-icons/hi2";
 import { RiSearchLine } from "react-icons/ri";
 import { IoMdHeartEmpty } from "react-icons/io";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import {
   collection,
@@ -28,6 +28,8 @@ const menuList = [
 ];
 
 const Navbar = () => {
+  const location = useLocation();
+  const isHome = location.pathname === "/";
   const totalCartItems = useSelector(selectTotalCartItems);
 
   const [data, setData] = useState<
@@ -128,7 +130,9 @@ const Navbar = () => {
   if (productNames.length === 0) return <></>;
 
   return (
-    <nav className="px-5 pb-5 sm:pb-0 pt-5 fixed top-0 w-screen z-50 bg-white shadow-md">
+    <nav
+      className={`px-5 pb-5 sm:pb-0 pt-5 fixed top-0 w-screen z-50 ${isHome ? "bg-transparent" : "bg-white shadow-md"}`}
+    >
       {/* UpperNav */}
       <div className="flex sm:justify-between gap-3 items-center px-3">
         <Link to={"/"} className="kanit-bold text-xl cursor-pointer">

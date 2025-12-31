@@ -26,7 +26,7 @@ const HomeFeatured = () => {
     // 🔹 Start auto-rotate
     model.autoRotate = true
 
-    
+
     const onLoad = () => {
       setModelLoaded(true) // ✅ model is ready, allow animation
     }
@@ -62,7 +62,7 @@ const HomeFeatured = () => {
 
 
   return (
-    <section className="relative pt-6 pb-10 antialiased md:pt-0 md:pb-10">
+    <section className="relative pt-24 pb-10 antialiased md:pt-28 md:pb-10">
       <VideoBackground />
       <div className="relative backdrop-blur-[0px] mx-auto grid px-4 pb-16 md:grid-cols-12 lg:gap-12 lg:pb-16 xl:gap-0 ">
         <div className="content-center justify-self-start md:col-span-7 md:ml-5 md:text-start">
@@ -95,14 +95,14 @@ const HomeFeatured = () => {
           <div className="relative w-full flex items-center justify-center group ">
 
             {/* Background Image */}
-            {/* <img
+        {/* <img
               src={Images.bg}
               className="absolute inset-0 w-full h-full object-contain scale-110 transition-transform duration-700 group-hover:scale-110"
               alt="Background"
             />
 
             {/* Shoe Image */}
-            {/* <img
+        {/* <img
               src={Images.shoe}
               className="relative z-10 w-[73%] object-cover translate-x-[-3%] translate-y-[-4%] scale-125 
              drop-shadow-[0_40px_60px_rgba(0,0,0,0.35)]
