@@ -1,4 +1,4 @@
-import { useState } from "react";
+// import { useState } from "react";
 import {
     Accordion,
     AccordionContent,
@@ -7,10 +7,10 @@ import {
 } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 
-interface FilterSidebarProps {
-    // We can add props here later if we want actual filtering logic to be passed down
-    // or use context/redux
-}
+// interface FilterSidebarProps {
+//     // We can add props here later if we want actual filtering logic to be passed down
+//     // or use context/redux
+// }
 
 const FilterSidebar = () => {
     // Mock data for filters to match the screenshot

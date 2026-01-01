@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import Images from "@/assets";
+// import Images from "@/assets";
 import logo1 from "/public/nexura-logo-1.png";
 // Footer Data
 

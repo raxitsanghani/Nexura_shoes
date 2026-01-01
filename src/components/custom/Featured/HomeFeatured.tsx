@@ -80,7 +80,7 @@ const HomeFeatured = () => {
           </p>
           <a
             href="#product_list"
-            className="inline-block rounded-lg bg-gray-900 px-6 py-3.5 text-center font-medium text-white hover:bg-black focus:outline-none focus:ring-4 focus:ring-zink-800 -600  "
+            className="inline-block rounded-lg bg-gray-900/20 text-gray-900 px-6 py-3.5 text-center font-medium hover:bg-black hover:text-white focus:outline-none focus:ring-4 focus:ring-zink-800 -600 transition-all duration-300 ease-in-out hover:scale-105 "
           >
             Shop Now!
           </a>
