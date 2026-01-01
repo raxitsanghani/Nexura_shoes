@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import Images from "@/assets";
+import logo1 from "/public/nexura-logo-1.png";
 // Footer Data
 
 const footerMarketPlace = [
@@ -82,7 +83,7 @@ export default function Footer() {
             <div className="mb-2">
               {/* Logo */}
               <Link to="/" className="inline-block" aria-label="Cruip">
-                <img src={Images.LOGO} alt="" className="w-14" />
+                <img src={logo1} alt="" className="w-32" />
               </Link>
             </div>
           </div>

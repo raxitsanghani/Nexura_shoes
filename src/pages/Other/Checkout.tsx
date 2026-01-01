@@ -15,7 +15,7 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import { clearCartItems } from "@/utils/cartOperations";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaCheck, FaTruck, FaMapMarkerAlt, FaCreditCard, FaArrowLeft, FaArrowRight, FaCreditCard as FaCardIcon, FaMoneyBillWave } from "react-icons/fa";
+import { FaCheck, FaTruck, FaMapMarkerAlt, FaCreditCard, FaArrowLeft, FaArrowRight, FaCreditCard as FaCardIcon, FaMoneyBillWave, FaQrcode } from "react-icons/fa";
 import { SiPhonepe } from "react-icons/si";
 
 // Initialize Firestore
@@ -57,6 +57,7 @@ const Checkout = () => {
     name: "",
     expiry: "",
   });
+  const [upiId, setUpiId] = useState("");
 
   // Cart / Order State
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -201,8 +202,7 @@ const Checkout = () => {
     }
   };
 
-  const handlePlaceOrder = async () => {
-    setLoading(true);
+  const processOrder = async (finalPaymentMethod: string, extraDetails: any = {}) => {
     const user = auth.currentUser;
     if (user && selectedAddress) {
       try {
@@ -213,8 +213,9 @@ const Checkout = () => {
           price: prices.total,
           address: selectedAddress,
           shipping: selectedShipping,
-          paymentMethod,
-          card: paymentMethod === 'card' ? selectedCard : null,
+          paymentMethod: finalPaymentMethod,
+          card: finalPaymentMethod === 'card' ? selectedCard : null,
+          ...extraDetails,
           products: cartItems,
           timestamp: Timestamp.now(),
           status: "Processing",
@@ -232,6 +233,23 @@ const Checkout = () => {
         setLoading(false);
       }
     }
+  };
+
+  const handlePlaceOrder = async () => {
+    setLoading(true);
+    await processOrder(paymentMethod);
+  };
+
+  const handleUpiPayment = async () => {
+    if (!upiId || !upiId.includes('@')) {
+      alert("Please enter a valid UPI ID (e.g., user@upi)");
+      return;
+    }
+    setLoading(true);
+    // Simulate Payment Processing
+    setTimeout(async () => {
+      await processOrder('UPI', { upiId, status: 'success', transactionId: "TXN" + Date.now() });
+    }, 3000);
   };
 
   const nextStep = () => setStep(s => Math.min(s + 1, 4));
@@ -399,11 +417,34 @@ const Checkout = () => {
                   )}
 
                   {paymentMethod === 'upi' && (
-                    <div className="border p-8 rounded-lg bg-gray-50 flex flex-col items-center text-center">
-                      <div className="bg-white p-4 rounded-full shadow mb-4 text-green-600"><SiPhonepe size={40} /></div>
-                      <h3 className="font-bold">Pay via UPI</h3>
-                      <p className="text-gray-500 text-sm mb-4">Scan QR code or enter VPA on next screen</p>
-                      <button className="px-6 py-2 bg-blue-600 text-white rounded-full font-bold">Connect UPI</button>
+                    <div className="border p-8 rounded-lg bg-gray-50 flex flex-col items-center text-center space-y-4">
+                      <div className="bg-white p-4 rounded-full shadow text-green-600"><SiPhonepe size={40} /></div>
+                      <h3 className="font-bold text-lg">Pay via UPI</h3>
+                      <p className="text-gray-500 text-sm">Scan QR code or enter your UPI ID</p>
+
+                      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <FaQrcode size={100} className="mx-auto text-gray-800" />
+                      </div>
+
+                      <div className="w-full max-w-sm space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase self-start">UPI ID / VPA</label>
+                        <input
+                          type="text"
+                          placeholder="username@bank"
+                          className="w-full p-3 border rounded-lg font-medium focus:ring-2 focus:ring-black focus:outline-none"
+                          value={upiId}
+                          onChange={(e) => setUpiId(e.target.value)}
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleUpiPayment}
+                        disabled={loading}
+                        className={`px-8 py-3 rounded-full font-bold text-white shadow-lg transition-all w-full max-w-xs flex items-center justify-center gap-2 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                      >
+                        {loading ? 'Processing...' : 'Connect UPI & Pay'}
+                      </button>
+                      {loading && <p className="text-xs text-gray-500 animate-pulse">Completing secure payment...</p>}
                     </div>
                   )}
                 </motion.div>
@@ -450,7 +491,7 @@ const Checkout = () => {
               </button>
             ) : <div />}
 
-            {step < 4 ? (
+            {step < 4 && !(step === 3 && paymentMethod === 'upi') ? (
               <button
                 onClick={() => {
                   if (step === 1 && !selectedAddress) return alert("Select Address");

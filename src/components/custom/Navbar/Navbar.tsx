@@ -17,6 +17,9 @@ import { DropdownMenuComp } from "@/pages/Other/DropdownMenu";
 import { Close } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { selectTotalCartItems } from "@/redux/cartSlice";
+import logo from "/public/nexura-logo.png";
+import logo1 from "/public/nexura-logo-1.png";
+import logo2 from "/public/nexura-logo-2.png";
 
 const menuList = [
   { name: "Home", path: "/" },
@@ -135,8 +138,9 @@ const Navbar = () => {
     >
       {/* UpperNav */}
       <div className="flex sm:justify-between gap-3 items-center px-3">
-        <Link to={"/"} className="kanit-bold text-xl cursor-pointer">
-          BR.<span className="text-cs_gray">F</span>
+        <Link to={"/"} className="flex felx-row text-xl cursor-pointer">
+          <img src={logo1} alt="Logo" className="w-24" />
+          {/* <img src={logo2} alt="Logo" className="w-24 ml-10" /> */}
         </Link>
         <div className="relative w-[22rem]" ref={searchRef}>
           <div className="bg-cs_white px-4 py-2 flex items-center font-light gap-3 rounded-xl w-full shadow-sm">
