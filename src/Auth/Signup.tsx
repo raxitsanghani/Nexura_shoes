@@ -57,7 +57,6 @@ const Signup = () => {
 
   const handleSignup = async (user: z.infer<typeof SignupValidation>) => {
     setLoading(true);
-    form.reset();
 
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -71,8 +70,10 @@ const Signup = () => {
       await createDoc(newUser, user.name);
 
       toast({ description: "User created!" });
+      form.reset();
       navigate("/");
     } catch (error) {
+      console.error("Signup Error:", error);
       const errorMessage =
         (error as Error).message || "An unknown error occurred";
       toast({ variant: "destructive", title: errorMessage });
@@ -83,25 +84,23 @@ const Signup = () => {
 
   async function createDoc(user: any, name?: string) {
     if (!user) return;
-    setLoading(true);
 
     const userRef = doc(db, "users", user.uid);
-    const userData = await getDoc(userRef);
-    if (!userData.exists()) {
-      try {
+    try {
+      const userData = await getDoc(userRef);
+      if (!userData.exists()) {
         await setDoc(userRef, {
           name: name || user.displayName || "",
           email: user.email,
           photoUrl: user.photoURL || "",
           createdAt: new Date(),
+          isBlocked: false,
         });
-      } catch (error) {
-        const errorMessage =
-          (error as Error).message || "An unknown error occurred";
-        toast({ variant: "destructive", title: errorMessage });
       }
+    } catch (error) {
+      console.error("Create Doc Error", error);
+      // Error propagation logic if needed, currently just logging
     }
-    setLoading(false);
   }
 
   function googleAuth() {
@@ -114,9 +113,18 @@ const Signup = () => {
         navigate("/");
       })
       .catch((error) => {
-        console.log(error);
-        const errorMessage =
-          (error as Error).message || "An unknown error occurred";
+        console.log("Google Auth Error:", error);
+        let errorMessage = (error as Error).message || "An unknown error occurred";
+
+        // Handle specific Firebase errors more gracefully
+        if (errorMessage.includes("auth/unauthorized-domain")) {
+          errorMessage = "Domain not authorized. Add 'nexura-sports.vercel.app' to Firebase Console > Authentication > Settings.";
+        } else if (errorMessage.includes("auth/popup-closed-by-user")) {
+          errorMessage = "Sign-in popup was closed before completion.";
+        } else if (errorMessage.includes("auth/popup-blocked")) {
+          errorMessage = "Sign-in popup was blocked by the browser. Please allow popups for this site.";
+        }
+
         toast({ variant: "destructive", title: errorMessage });
       })
       .finally(() => {
@@ -128,8 +136,10 @@ const Signup = () => {
     <Form {...form}>
       <div className="flex flex-1 h-screen justify-center items-center flex-col py-10">
         <div className="sm:w-420 md:w-[24rem] flex-center flex-col">
-          <img src={Images.LOGO} alt="logo" className="w-8" />
-          <h2 className="text-2xl text-white">FinanceInsight</h2>
+          <div className="flex items-center gap-3 justify-center">
+            <img src={Images.LOGO} alt="logo" className="w-12" />
+            <h2 className="text-2xl ">Welcome to Nexura</h2>
+          </div>
 
           <h2 className="h3-bold md:h2-bold pt-5 sm:pt-6">
             Create a new account
@@ -222,7 +232,7 @@ const Signup = () => {
               Already have an account?
               <Link
                 to="/login"
-                className="text-primary-500 text-small-semibold ml-1"
+                className="text-cs_yellow text-small-semibold ml-1"
               >
                 Log in
               </Link>

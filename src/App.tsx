@@ -22,7 +22,7 @@ import OrderConfirmation from "./pages/Other/OrderConfirm";
 import AdminRoutes from "./Admin/AdminRoutes";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, doc, onSnapshot, getDoc } from "firebase/firestore";
-import { Toaster, toast } from 'react-hot-toast'; // Using react-hot-toast for global app notifications
+import { Toaster, toast } from 'react-hot-toast';
 
 const capitalizePath = (path: string) => {
   const capitalized = path.slice(1).replace(/^\w/, (c) => c.toUpperCase());
@@ -51,6 +51,11 @@ const App = () => {
     const db = getFirestore();
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      // SKIP CHECKS ON SIGNUP PAGE or if explicitly navigating there
+      if (location.pathname === "/signup") {
+        return;
+      }
+
       if (currentUser) {
         // 1. Check if user is in 'deleted_users' blacklist (Historical check/Login check)
         const deletedRef = doc(db, "deleted_users", currentUser.email || "unknown");
@@ -72,17 +77,25 @@ const App = () => {
         }
 
         // 2. Real-time User Document Listener
-        // This handles "Block user while active" and "Delete user while active"
-        // Only attach if user exists in auth
         const userRef = doc(db, "users", currentUser.uid);
 
         const unsubscribeSnapshot = onSnapshot(userRef, async (docSnap) => {
-          // Case A: User Document Deleted (Permanent Delete)
+          // SKIP IF ON SIGNUP
+          if (location.pathname === '/signup') return;
+
+          // Case A: User Document Deleted (or Not Created Yet)
           if (!docSnap.exists()) {
-            // Ensure we don't kick out if it's a brand new signup that hasn't written doc yet. 
-            // Usually signup writes doc immediately.
-            // To be safe, maybe check creation time? 
-            // Simplest: If doc gone, you gone.
+            // GRACE PERIOD: If user was created < 15 seconds ago, ignore missing doc logic.
+            const creationTime = currentUser.metadata.creationTime;
+            if (creationTime) {
+              const createdMs = new Date(creationTime).getTime();
+              const nowMs = new Date().getTime();
+              // 15 seconds grace period for doc creation
+              if (nowMs - createdMs < 15000) {
+                return;
+              }
+            }
+
             if (auth.currentUser) {
               await signOut(auth);
               toast.error("Your account has been permanently deleted.", {
@@ -104,10 +117,14 @@ const App = () => {
             }
           }
         }, (error) => {
-          console.log("Auth snapshot error (likely permission denied due to block/delete):", error);
-          // Permission denied often happens if rules say "allow read if !blocked". 
-          // If so, we assume blocked/deleted.
+          console.log("Auth snapshot error (likely permission or doc missing):", error);
+          if (location.pathname === '/signup') return;
+
           if (auth.currentUser) {
+            const creationTime = currentUser.metadata.creationTime;
+            if (creationTime && (new Date().getTime() - new Date(creationTime).getTime() < 15000)) {
+              return;
+            }
             signOut(auth);
             navigate("/login");
           }
@@ -118,7 +135,47 @@ const App = () => {
     });
 
     return () => unsubscribeAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
+
+  // Network & Ad-Blocker Detection
+  useEffect(() => {
+    const checkConnectivity = async () => {
+      try {
+        // Simple fetch to a google resource to check if blocked
+        await fetch("https://firestore.googleapis.com", { mode: 'no-cors' });
+      } catch (e) {
+        console.log("Potential Ad-Blocker blocking Firestore", e);
+        // Verify if it's just offline
+        if (navigator.onLine) {
+          toast("It looks like an Ad Blocker is blocking the database connection. Please disable it for this site to function correctly.", {
+            duration: 8000,
+            id: "adblock-warning",
+            icon: '⚠️',
+            style: {
+              background: '#333',
+              color: '#fff',
+            }
+          });
+        }
+      }
+    };
+
+    // Run once on mount
+    checkConnectivity();
+
+    const handleOffline = () => toast.error("You are offline. Some features may not work.", { id: "offline-toast" });
+    const handleOnline = () => {
+      toast.success("You are back online!", { id: "online-toast" }); // Connection recovery
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    }
+  }, []);
 
   return (
     <>
