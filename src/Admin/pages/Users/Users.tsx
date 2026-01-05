@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import UserTable from "@/Admin/components/Tables/UserTable";
 import ReactLoading from "react-loading";
 import {
