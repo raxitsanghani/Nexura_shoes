@@ -13,6 +13,9 @@ import { FiAlertCircle } from "react-icons/fi";
 import ReactLoading from "react-loading";
 import toast, { Toaster } from 'react-hot-toast';
 
+import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+
 interface Order {
   orderId: string;
   // Support both legacy date object or Firestore Timestamp
@@ -22,11 +25,16 @@ interface Order {
   price: number;
   status: string;
   products: any[];
+  paymentMethod?: string;
+  address?: any;
 }
 
 const OrdersList = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Expanded State for "View Details"
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Cancellation Modal State
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -37,6 +45,7 @@ const OrdersList = () => {
   const auth = getAuth();
   const db = getFirestore();
   const userId = auth.currentUser?.uid;
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!userId) {
@@ -118,6 +127,14 @@ const OrdersList = () => {
     }
   };
 
+  const toggleDetails = (orderId: string) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+    } else {
+      setExpandedOrderId(orderId);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 relative">
       <Toaster />
@@ -171,46 +188,131 @@ const OrdersList = () => {
             <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">My Orders</h2>
             <div className="divide-y divide-gray-200">
               {orders.map((order) => (
-                <div
-                  key={order.orderId}
-                  className="relative flex flex-wrap items-center gap-y-4 py-6 border-b border-gray-200 last:border-b-0"
-                >
-                  <div className="w-full sm:w-1/2 md:w-1/4">
-                    <h3 className="text-xs font-medium text-gray-500 uppercase">Order ID</h3>
-                    <p className="mt-1 text-base font-bold text-gray-900">{order.orderId}</p>
-                  </div>
-                  <div className="w-full sm:w-1/2 md:w-1/4">
-                    <h3 className="text-xs font-medium text-gray-500 uppercase">Date</h3>
-                    <p className="mt-1 text-base font-medium text-gray-900">{order.date}</p>
-                  </div>
-                  <div className="w-full sm:w-1/2 md:w-1/4">
-                    <h3 className="text-xs font-medium text-gray-500 uppercase">Total</h3>
-                    <p className="mt-1 text-base font-medium text-gray-900">₹ {Number(order.price).toFixed(2)}</p>
-                  </div>
-                  <div className="w-full sm:w-1/2 md:w-1/4">
-                    <h3 className="text-xs font-medium text-gray-500 uppercase">Status</h3>
-                    <div className={`mt-1 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${getStatusColor(order.status)}`}>
-                      {order.status}
+                <div key={order.orderId} className="flex flex-col py-6 border-b border-gray-200 last:border-b-0">
+                  {/* Order Main Row */}
+                  <div className="flex flex-wrap items-center gap-y-4">
+                    <div className="w-full sm:w-1/2 md:w-1/5">
+                      <h3 className="text-xs font-medium text-gray-500 uppercase">Order ID</h3>
+                      <p className="mt-1 text-base font-bold text-gray-900">{order.orderId}</p>
+                    </div>
+                    <div className="w-full sm:w-1/2 md:w-1/5">
+                      <h3 className="text-xs font-medium text-gray-500 uppercase">Date</h3>
+                      <p className="mt-1 text-base font-medium text-gray-900">{order.date}</p>
+                    </div>
+                    <div className="w-full sm:w-1/2 md:w-1/5">
+                      <h3 className="text-xs font-medium text-gray-500 uppercase">Total</h3>
+                      <p className="mt-1 text-base font-medium text-gray-900">₹ {Number(order.price).toFixed(2)}</p>
+                    </div>
+                    <div className="w-full sm:w-1/2 md:w-1/5">
+                      <h3 className="text-xs font-medium text-gray-500 uppercase">Status</h3>
+                      <div className={`mt-1 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </div>
+                    </div>
+
+                    {/* Actions Column */}
+                    <div className="w-full md:w-1/5 flex flex-col items-end gap-2">
+                      <button
+                        onClick={() => toggleDetails(order.orderId)}
+                        className="w-full sm:w-auto rounded bg-black px-4 py-2 text-xs font-bold text-white hover:bg-gray-800 transition-colors uppercase tracking-wider"
+                      >
+                        {expandedOrderId === order.orderId ? 'Hide Details' : 'View Details'}
+                      </button>
+
+                      {order.status !== "Cancelled" && order.status !== "Cancellation Requested" && (
+                        <button
+                          type="button"
+                          onClick={() => openCancelModal(order.orderId)}
+                          className="w-full sm:w-auto rounded bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200 hover:text-red-600 transition-colors uppercase tracking-wider"
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+
+                      {order.status === "Cancellation Requested" && (
+                        <span className="text-xs text-orange-600 font-medium flex items-center gap-1">
+                          <FiAlertCircle /> Cancellation Pending
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="w-full flex justify-end mt-2">
-                    {order.status !== "Cancelled" && order.status !== "Cancellation Requested" && (
-                      <button
-                        type="button"
-                        onClick={() => openCancelModal(order.orderId)}
-                        className="rounded bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200 hover:text-red-600 transition-colors uppercase tracking-wider"
+                  {/* Expanded Details Section */}
+                  <AnimatePresence>
+                    {expandedOrderId === order.orderId && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden bg-gray-50 mt-4 rounded-lg border border-gray-100"
                       >
-                        Cancel Order
-                      </button>
+                        <div className="p-4 sm:p-6">
+                          <h4 className="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wide">Products in this Order</h4>
+                          <div className="space-y-4">
+                            {order.products && Array.isArray(order.products) ? (
+                              order.products.map((item: any, idx: number) => {
+                                // Safe data extraction
+                                const product = item.product || {};
+                                const productName = product.name || "Unknown Product";
+                                const productImg = product.defaultImage || (product.imageUrls ? Object.values(product.imageUrls)[0] : '') || "";
+                                const productPrice = product.price || 0;
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="flex flex-col sm:flex-row items-start sm:items-center bg-white p-4 rounded-md shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer gap-4"
+                                    onClick={() => navigate(`/product/${item.productId}`)}
+                                  >
+                                    {/* Product Image */}
+                                    <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+                                      {productImg ? (
+                                        <img src={productImg} alt={productName} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Img</div>
+                                      )}
+                                    </div>
+
+                                    {/* Product Details */}
+                                    <div className="flex-1 min-w-0">
+                                      <h5 className="text-sm font-bold text-gray-900 truncate">{productName}</h5>
+                                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
+                                        {item.size && <span className="bg-gray-100 px-2 py-0.5 rounded">Size: {item.size}</span>}
+                                        {item.color && <span className="bg-gray-100 px-2 py-0.5 rounded">Color: {item.color}</span>}
+                                      </div>
+                                      <p className="mt-2 text-xs font-semibold text-gray-500">Qty: {item.quantity}</p>
+                                    </div>
+
+                                    {/* Price & Status */}
+                                    <div className="mt-2 sm:mt-0 text-right">
+                                      <p className="font-bold text-gray-900">₹{parseFloat(String(productPrice)).toFixed(2)}</p>
+                                      <span className={`text-xs font-medium ${order.status === 'Cancelled' ? 'text-red-500' : 'text-green-600'}`}>
+                                        {order.status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-sm text-gray-500 italic">Product details not available for this order.</p>
+                            )}
+                          </div>
+
+                          {/* Quick Stats or Shipping Info (Optional enhancement) */}
+                          <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between text-xs text-gray-500">
+                            <div>
+                              <span className="font-semibold block">Payment Method:</span>
+                              <span className="uppercase">{order.paymentMethod || "N/A"}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-semibold block">Shipping Address:</span>
+                              <span>{order.address ? `${order.address.city}, ${order.address.state}` : "N/A"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                    {order.status === "Cancellation Requested" && (
-                      <span className="text-xs text-orange-600 font-medium flex items-center gap-1">
-                        <FiAlertCircle /> Cancellation Pending
-                      </span>
-                    )}
-                  </div>
+                  </AnimatePresence>
                 </div>
               ))}
             </div>
