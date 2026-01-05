@@ -15,7 +15,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { fetchUserFavorites } from "@/utils/fetchUserFavorites";
 import { handleAddToCart } from "@/utils/handleToggleCart";
 import ReactLoading from "react-loading";
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from "framer-motion";
 
 const ProductDetails = ({
@@ -42,6 +42,12 @@ const ProductDetails = ({
     });
     return () => unsubscribe();
   }, [auth]);
+
+  useEffect(() => {
+    setSize(null);
+    setSelectedColor(null);
+    setSizeError(false);
+  }, [id]);
 
   useEffect(() => {
     if (userId && product) {
@@ -145,7 +151,6 @@ const ProductDetails = ({
 
   return (
     <div className="md:px-8 py-8 md:ml-0 max-w-2xl">
-      <Toaster position="top-center" reverseOrder={false} />
 
       {/* Brand & Title */}
       <div className="flex flex-col gap-2 mb-6">

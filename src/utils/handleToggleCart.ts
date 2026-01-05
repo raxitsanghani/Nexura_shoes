@@ -18,6 +18,11 @@ export const handleAddToCart = async (
 ) => {
   const userRef = doc(db, "users", userId);
 
+  if (!size) {
+    console.error("Size requirement not met for add to cart.");
+    throw new Error("Size is mandatory");
+  }
+
   try {
     const userDoc = await getDoc(userRef);
 
