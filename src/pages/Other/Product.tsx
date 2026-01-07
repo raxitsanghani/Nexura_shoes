@@ -10,6 +10,8 @@ import ReactLoading from "react-loading";
 import ProductReviews from "@/components/custom/Product/ProductReviews";
 import ProductRecommendations from "@/components/custom/Product/ProductRecommendations";
 
+import SEO from "@/components/custom/SEO";
+
 const Product = () => {
   const { id } = useParams<{ id: string }>();
   const dispatch = useDispatch<AppDispatch>();
@@ -26,8 +28,6 @@ const Product = () => {
     }
   }, [status, dispatch]);
 
-
-
   if (status === "loading")
     return (
       <div className="w-screen flex items-center justify-center h-screen -mt-24">
@@ -42,6 +42,10 @@ const Product = () => {
 
   return (
     <>
+      <SEO
+        title={product.name}
+        description={product.description || `Buy ${product.name} at Nexura Sports. Best price and quality.`}
+      />
       <div className="px-6 flex gap-4 lg:flex-row flex-col p-3">
         <ProductImage selectedColor={selectedColor} product={product} />
         <div className="h-full lg:w-[50%] float-end">

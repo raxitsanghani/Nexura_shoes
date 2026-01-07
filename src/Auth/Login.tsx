@@ -273,6 +273,15 @@ const Login = () => {
               <FcGoogle size={"1.5rem"} className="mr-1" /> Sign Up With Google
             </Button>
 
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 w-full border-gray-400"
+              onClick={() => navigate("/checkout", { state: { isGuest: true } })}
+            >
+              Continue as Guest
+            </Button>
+
             <p className="text-small-regular text-light-2 text-center mt-2">
               Don't have an account?
               <Link

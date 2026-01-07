@@ -8,7 +8,7 @@ import { fetchUserFavorites } from "@/utils/fetchUserFavorites";
 import ReactLoading from "react-loading";
 import { Product } from "@/types";
 import ProductCard from "./ProductCard";
-
+import FilterSidebar, { FilterState } from "./FilterSidebar";
 
 interface ProductListProps {
   selectedCategory?: string;
@@ -23,6 +23,13 @@ const ProductList: React.FC<ProductListProps> = ({ selectedCategory }) => {
   const [userFavorites, setUserFavorites] = useState<string[]>([]);
   const auth = getAuth();
 
+  // Filter State
+  const [filterState, setFilterState] = useState<FilterState>({
+    priceRange: { min: "", max: "" },
+    sort: "newest",
+    colors: [],
+  });
+
   useEffect(() => {
     dispatch(fetchProducts());
   }, [dispatch]);
@@ -30,37 +37,74 @@ const ProductList: React.FC<ProductListProps> = ({ selectedCategory }) => {
   useEffect(() => {
     if (productsStatus === "succeeded") {
       const productEntries = Object.entries(products);
-      const filtered = productEntries
+      let tempProducts = productEntries
         .map(([id, product]) => ({
           // @ts-ignore
           id,
           ...(product as Product),
-        }))
-        .filter((product) => {
-          if (selectedCategory && selectedCategory.toLowerCase() === 'sale') {
-            // Filter products that have a non-zero discount
-            const d = product.discount ? product.discount.trim() : "";
+        }));
+
+      // 1. Category Filtering
+      if (selectedCategory) {
+        if (selectedCategory.toLowerCase() === 'sale') {
+          tempProducts = tempProducts.filter(p => {
+            const d = p.discount ? p.discount.trim() : "";
             return d !== "" && d !== "0" && d !== "0%";
-          }
-          if (selectedCategory) {
-            const normalizedCategory = selectedCategory.trim().toLowerCase();
-            return product.categories
+          });
+        } else {
+          const normalizedCategory = selectedCategory.trim().toLowerCase();
+          tempProducts = tempProducts.filter(product =>
+            product.categories && product.categories
               .map((c) => c.trim().toLowerCase())
               .some(c => {
                 if (normalizedCategory === 'woman' && (c === 'women' || c === 'woman')) return true;
                 if (normalizedCategory === 'man' && (c === 'men' || c === 'man')) return true;
                 return c === normalizedCategory;
-              });
-          }
-          return true;
+              })
+          );
+        }
+      }
+
+      // 2. Advanced Filtering
+      // Price
+      if (filterState.priceRange.min) {
+        tempProducts = tempProducts.filter(p => Number(p.price) >= Number(filterState.priceRange.min));
+      }
+      if (filterState.priceRange.max) {
+        tempProducts = tempProducts.filter(p => Number(p.price) <= Number(filterState.priceRange.max));
+      }
+
+      // Colors
+      if (filterState.colors.length > 0) {
+        tempProducts = tempProducts.filter(p => {
+          // Check if product explicit colors or image keys match any selected color
+          const pColors = (p.colors || []).concat(Object.keys(p.imageUrls || {}));
+          return pColors.some(pc =>
+            filterState.colors.some(selected => pc.toLowerCase().includes(selected.toLowerCase()))
+          );
         });
-      setFilteredProducts(filtered.sort((a: any, b: any) => {
-        const dateA = a.createdAt || "";
-        const dateB = b.createdAt || "";
-        return dateB.localeCompare(dateA);
-      }));
+      }
+
+      // 3. Sorting
+      tempProducts.sort((a: any, b: any) => {
+        switch (filterState.sort) {
+          case 'price_asc':
+            return Number(a.price) - Number(b.price);
+          case 'price_desc':
+            return Number(b.price) - Number(a.price);
+          case 'name_asc':
+            return a.name.localeCompare(b.name);
+          case 'newest':
+          default:
+            const dateA = a.createdAt || "";
+            const dateB = b.createdAt || "";
+            return dateB.localeCompare(dateA);
+        }
+      });
+
+      setFilteredProducts(tempProducts);
     }
-  }, [productsStatus, selectedCategory, products]);
+  }, [productsStatus, selectedCategory, products, filterState]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -106,7 +150,7 @@ const ProductList: React.FC<ProductListProps> = ({ selectedCategory }) => {
       </div>
     );
   if (productsStatus === "failed") return <div>Error fetching products</div>;
-  if (filteredProducts.length === 0) return <div>No products available.</div>;
+  if (filteredProducts.length === 0 && !filterState.priceRange.min && !filterState.priceRange.max && filterState.colors.length === 0) return <div>No products available.</div>;
 
   return (
     <section id="product_list" className="bg-white py-8 antialiased dark:bg-gray-900 mt-0 md:py-8">
@@ -121,20 +165,24 @@ const ProductList: React.FC<ProductListProps> = ({ selectedCategory }) => {
 
         <div className="flex flex-col lg:flex-row">
           {/* Sidebar */}
-
+          <FilterSidebar filterState={filterState} setFilterState={setFilterState} />
 
           {/* Grid */}
           <div className="flex-1">
-            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isFavorite={userFavorites.includes(product.id)}
-                  onToggleFavorite={handleFavoriteClick}
-                />
-              ))}
-            </div>
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-20 text-gray-500">No products match your filters.</div>
+            ) : (
+              <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+                {filteredProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    isFavorite={userFavorites.includes(product.id)}
+                    onToggleFavorite={handleFavoriteClick}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -15,8 +15,10 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import { clearCartItems } from "@/utils/cartOperations";
 import { motion, AnimatePresence } from "framer-motion";
+import { findMatchingKey } from "@/utils/productUtils";
 import { FaCheck, FaTruck, FaMapMarkerAlt, FaCreditCard, FaArrowLeft, FaArrowRight, FaCreditCard as FaCardIcon, FaMoneyBillWave, FaQrcode } from "react-icons/fa";
 import { SiPhonepe } from "react-icons/si";
+import { sendOrderConfirmationEmail } from "@/utils/emailUtils";
 
 // Initialize Firestore
 const db = getFirestore();
@@ -58,6 +60,7 @@ const Checkout = () => {
     expiry: "",
   });
   const [upiId, setUpiId] = useState("");
+  const [guestEmail, setGuestEmail] = useState(""); // Guest Email State
 
   // Cart / Order State
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -71,23 +74,25 @@ const Checkout = () => {
 
   const { state } = location;
   const initialData = state || {};
+  const isGuest = initialData.isGuest;
+
+  useEffect(() => {
+    if (!auth.currentUser && !isGuest) {
+      navigate("/login");
+    }
+  }, [auth.currentUser, isGuest, navigate]);
 
   // Fetch User Data
   useEffect(() => {
     const fetchUserData = async () => {
       const user = auth.currentUser;
-      if (user) {
+      if (user && !isGuest) {
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setAddresses(userData?.addresses || []);
             setCards(userData?.cards || []);
-
-            // Sync cart items if not passed via nav (though usually passed)
-            if (!initialData.cartItems) {
-              // Fallback or use cart slice logic if needed, but assuming passed for now or simple fetch
-            }
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
@@ -95,7 +100,7 @@ const Checkout = () => {
       }
     };
     fetchUserData();
-  }, [auth.currentUser]);
+  }, [auth.currentUser, isGuest]);
 
   // Sync Prices & Cart
   useEffect(() => {
@@ -158,10 +163,11 @@ const Checkout = () => {
 
       // Update state if cart items are present
       setCartItems(items);
+      const voucherDiscount = initialData.voucherDiscount || 0;
       setPrices({
-        total: subtotal - totalDiscount + tax,
+        total: subtotal - totalDiscount - voucherDiscount + tax, // Apply voucher discount here
         original: subtotal,
-        discount: totalDiscount,
+        discount: totalDiscount + voucherDiscount,
         tax: tax,
         pickup: 0
       });
@@ -184,6 +190,11 @@ const Checkout = () => {
       } catch (error) {
         console.error("Error adding address:", error);
       }
+    } else {
+      // Guest: Local update only
+      setAddresses(prev => [...prev, newAddress]);
+      setSelectedAddress(newAddress);
+      setNewAddress({ name: "", city: "", state: "", zipcode: "", mobile: "" });
     }
   };
 
@@ -199,17 +210,23 @@ const Checkout = () => {
         setSelectedCard(newCard);
         setNewCard({ number: "", name: "", expiry: "" });
       } catch (err) { console.error(err); }
+    } else if (newCard.number) {
+      // Guest
+      setCards(prev => [...prev, newCard]);
+      setSelectedCard(newCard);
+      setNewCard({ number: "", name: "", expiry: "" });
     }
   };
 
   const processOrder = async (finalPaymentMethod: string, extraDetails: any = {}) => {
     const user = auth.currentUser;
-    if (user && selectedAddress) {
+
+    if (selectedAddress) {
       try {
         const orderId = `#${Math.random().toString(36).toUpperCase().substr(2, 9)}`;
         const orderData = {
           orderId,
-          userId: user.uid,
+          userId: user ? user.uid : "GUEST",
           price: prices.total,
           address: selectedAddress,
           shipping: selectedShipping,
@@ -222,7 +239,17 @@ const Checkout = () => {
         };
 
         await setDoc(doc(db, "orders", orderId), orderData);
-        await clearCartItems(user.uid);
+
+        // Send Email
+        const emailToSend = user ? user.email : guestEmail;
+        if (emailToSend) {
+          await sendOrderConfirmationEmail(emailToSend, orderData);
+        }
+
+        if (user) {
+          await clearCartItems(user.uid);
+        }
+
         dispatch(clearCart());
 
         setTimeout(() => {
@@ -328,6 +355,17 @@ const Checkout = () => {
                   <div id="new-address-form" className="pt-6 border-t font-semibold">
                     <h3 className="mb-4">Or Add New Address</h3>
                     <div className="grid grid-cols-2 gap-4">
+                      {/* Guest Email Input */}
+                      {!auth.currentUser && (
+                        <input
+                          type="email"
+                          placeholder="Email Address (for Order Updates)"
+                          className="p-3 border rounded col-span-2"
+                          value={guestEmail}
+                          onChange={e => setGuestEmail(e.target.value)}
+                        />
+                      )}
+
                       <input type="text" placeholder="Full Name" className="p-3 border rounded" value={newAddress.name} onChange={e => setNewAddress({ ...newAddress, name: e.target.value })} />
                       <input type="text" placeholder="Mobile" className="p-3 border rounded" value={newAddress.mobile} onChange={e => setNewAddress({ ...newAddress, mobile: e.target.value })} />
                       <input type="text" placeholder="City" className="p-3 border rounded" value={newAddress.city} onChange={e => setNewAddress({ ...newAddress, city: e.target.value })} />
@@ -456,18 +494,38 @@ const Checkout = () => {
                   <h2 className="text-xl font-bold mb-6">Order Review</h2>
 
                   <div className="space-y-4 mb-8">
-                    {cartItems.map((item: any, idx: number) => (
-                      <div key={idx} className="flex gap-4 border-b pb-4">
-                        <div className="w-16 h-16 bg-gray-100 rounded">
-                          {/* Simplified display, ideally fetch product details */}
-                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">IMG</div>
+                    {cartItems.map((item: any, idx: number) => {
+                      const effectiveColor = item.color ? findMatchingKey(item.product?.imageUrls, item.color) || "default" : "default";
+
+                      const validImages = (item.product?.imageUrls?.[effectiveColor] || []).filter((url: string) => url && url.trim() !== "");
+
+                      // Fallback logic
+                      let fallbackImage = item.product?.defaultImage;
+                      if (!fallbackImage) {
+                        const allImages = Object.values(item.product?.imageUrls || {});
+                        if (allImages.length > 0 && Array.isArray(allImages[0]) && allImages[0].length > 0) {
+                          fallbackImage = allImages[0][0] as string;
+                        }
+                      }
+
+                      const imageUrl = validImages.length > 0 ? validImages[0] : (fallbackImage || "");
+
+                      return (
+                        <div key={idx} className="flex gap-4 border-b pb-4">
+                          <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden border border-gray-200">
+                            {imageUrl ? (
+                              <img src={imageUrl} alt={item.product?.name || "Product"} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">IMG</div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-sm line-clamp-1">Product ID: {item.productId}</h4>
+                            <p className="text-xs text-gray-500">Size: {item.size} | Color: {item.color} | Qty: {item.quantity}</p>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-bold text-sm line-clamp-1">Product ID: {item.productId}</h4>
-                          <p className="text-xs text-gray-500">Size: {item.size} | Color: {item.color} | Qty: {item.quantity}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="bg-gray-50 p-4 rounded text-sm space-y-2">

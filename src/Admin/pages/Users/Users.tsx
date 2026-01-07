@@ -21,21 +21,58 @@ const Users = () => {
 
   useEffect(() => {
     // Real-time listener for users
-    const q = query(collection(db, "users"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedUsers = snapshot.docs.map(doc => ({
+    const qUsers = query(collection(db, "users"));
+
+    // Real-time listener for orders to aggregate counts
+    const qOrders = query(collection(db, "orders"));
+
+    // We can't nest onSnapshot easily in a clean way without managing unsubs, so let's separate them
+    // or just fetch orders once if real-time isn't critical, but for Admin, real-time is nice.
+    // Let's use a combined effect or just two separate listeners that update a common state 
+    // but React batching might be tricky. 
+
+    // Simpler approach: Fetch users, then listen to orders or vice versa. 
+    // Actually, listening to both independently and merging is best.
+
+    let usersMap: any[] = [];
+    let ordersMap: Record<string, number> = {};
+
+    const unsubscribeUsers = onSnapshot(qUsers, (userSnap) => {
+      usersMap = userSnap.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setUsers(fetchedUsers);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to load users");
-      setLoading(false);
+      mergeAndSet();
     });
 
-    return () => unsubscribe();
+    const unsubscribeOrders = onSnapshot(qOrders, (orderSnap) => {
+      const counts: Record<string, number> = {};
+      orderSnap.docs.forEach(doc => {
+        const order = doc.data();
+        if (order.userId) {
+          counts[order.userId] = (counts[order.userId] || 0) + 1;
+        }
+      });
+      ordersMap = counts;
+      mergeAndSet();
+    });
+
+    const mergeAndSet = () => {
+      // Only set if we have users loaded (orders can be empty)
+      if (usersMap.length >= 0) {
+        const merged = usersMap.map(u => ({
+          ...u,
+          totalOrders: ordersMap[u.id] || 0
+        }));
+        setUsers(merged);
+        setLoading(false);
+      }
+    };
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeOrders();
+    };
   }, [db]);
 
   const handleBlockUser = async (userId: string, currentStatus: boolean) => {

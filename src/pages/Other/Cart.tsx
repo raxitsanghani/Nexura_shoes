@@ -18,6 +18,7 @@ import { RootState, AppDispatch } from "@/redux/store/store";
 import { Link, useNavigate } from "react-router-dom";
 import Images from "@/assets";
 import ReactLoading from "react-loading";
+import { toast } from 'react-hot-toast';
 
 const Cart = () => {
   const [loading, setLoading] = useState(true);
@@ -119,7 +120,7 @@ const Cart = () => {
       (total, [productId, { quantity }]) => {
         // @ts-ignore
         const product = products[productId];
-        return total + (product?.price || 0) * quantity;
+        return total + Number(product?.price || 0) * Number(quantity);
       },
       0
     );
@@ -143,7 +144,7 @@ const Cart = () => {
         const numericDiscount = parseDiscount(discount);
 
         if (discount.includes("%")) {
-          return total + (numericDiscount / 100) * (quantity * product.price);
+          return total + (Number(numericDiscount) / 100) * (Number(quantity) * Number(product.price));
         } else {
           return total + numericDiscount * quantity;
         }
@@ -163,18 +164,36 @@ const Cart = () => {
   const storePickupFee = getStorePickupFee(totalOriginalPrice);
   const tax = getTax(totalOriginalPrice);
   const totalPrice = totalOriginalPrice - totalDiscount + storePickupFee + tax;
+  // Coupon Logic
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+
+  const handleApplyVoucher = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (voucherCode.trim().toUpperCase() === "WELCOME20") {
+      setVoucherDiscount(20);
+      toast.success("Coupon applied! ₹20 discount.");
+    } else if (voucherCode.trim().toUpperCase() === "SALE10") {
+      setVoucherDiscount(10);
+      toast.success("Coupon applied! ₹10 discount.");
+    } else {
+      setVoucherDiscount(0);
+      toast.error("Invalid coupon code.");
+    }
+  };
+
   const handleCheckout = () => {
     const userId = auth.currentUser?.uid;
     if (userId) {
-      // Ensure cartItems is an array, and totalPrice is a number
       navigate("/checkout", {
         state: {
-          totalPrice: totalPrice || 0, // Ensure totalPrice is a number
+          totalPrice: totalPrice - voucherDiscount, // Apply the voucher discount here
           totalOriginalPrice: totalOriginalPrice || 0,
-          totalDiscount: totalDiscount || 0,
+          totalDiscount: totalDiscount + voucherDiscount,
           storePickupFee: storePickupFee || 0,
           tax: tax || 0,
           cartItems: cartItems || 0,
+          voucherDiscount: voucherDiscount,
         },
       });
     }
@@ -212,7 +231,7 @@ const Cart = () => {
                 // this is discount and we want total discount for below cide
                 if (!product) return null;
 
-                const totalPrice = (product.price * item.quantity).toFixed(2);
+                const totalPrice = (Number(product.price) * Number(item.quantity)).toFixed(2);
                 return (
                   <div className="space-y-6" key={productId}>
                     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 md:p-6">
@@ -358,6 +377,16 @@ const Cart = () => {
                         {/* Display total Discount here */}
                       </dd>
                     </dl>
+                    {voucherDiscount > 0 && (
+                      <dl className="flex items-center justify-between gap-4">
+                        <dt className="text-base font-normal text-gray-500 dark:text-gray-400">
+                          Voucher
+                        </dt>
+                        <dd className="text-base font-medium text-green-600">
+                          - ₹{voucherDiscount}
+                        </dd>
+                      </dl>
+                    )}
                     <dl className="flex items-center justify-between gap-4">
                       <dt className="text-base font-normal text-gray-500 dark:text-gray-400">
                         Store Pickup
@@ -382,7 +411,7 @@ const Cart = () => {
                       Total
                     </dt>
                     <dd className="text-base font-bold text-gray-900 dark:text-white">
-                      ₹{totalPrice.toFixed(2)}
+                      ₹{(totalPrice - voucherDiscount).toFixed(2)}
                     </dd>
                   </dl>
                 </div>
@@ -432,7 +461,7 @@ const Cart = () => {
                 )}
               </div>
               <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
-                <form className="space-y-4">
+                <form className="space-y-4" onSubmit={handleApplyVoucher}>
                   <div>
                     <label
                       htmlFor="voucher"
@@ -443,6 +472,8 @@ const Cart = () => {
                     <input
                       type="text"
                       id="voucher"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value)}
                       className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-primary-500 dark:focus:ring-primary-500"
                     />
                   </div>
